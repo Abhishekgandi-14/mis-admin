@@ -336,7 +336,70 @@ function renderExpTab(D,tab){const cfg={salary:{t:'Salary',d:D.salary,ak:['Gross
 function downloadTemplate(){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Month','Client Name','Invoice Number','Taxable Value','GST','Invoice Value','Invoice Date','Payment Date'],["February'26",'Zerodha Broking Limited','NOCAC/25-26/001',3708887,667600,4376487,'04-Feb-2026','16-Feb-2026']]),'Revenue');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Employee ID','Name','Hire Date','Designation','Has Left The Organization','Working Days','Gross Salary'],['YAAS007','Nitesh Wankhede','15-Jan-2024','Channel Manager','No',28,101800]]),'Salary');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Freelancer ID','Name','Designation','Client Name','IP Name','Amount'],['FL001','Veehal Antony','Cinematographer','All Channels','All',222222]]),'Freelancers');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name of the Office','Amount'],['Hustle Space',348000]]),'Office Rent');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name of the Subscription','Amount'],['Google Workspace',283392]]),'Subscriptions');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Client Name','IP Name','Amount'],['John Doe','Vodafone','Brand IP',198200]]),'Influencer Marketing');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Shoot Description','Client Name','IP Name','Amount'],['Studio Shoot','Product Video','Meril','Main',187600]]),'Production Expenses');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Amount'],['Prudence Accounting',245000]]),'Professional Fee');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Amount'],['Telephone Expenses',3340]]),'Other Expenses');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Description','Amount'],['Team Lunch','Monthly',15000]]),'Staff Welfare');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Date','YAAS ID','Name','Amount'],['24-Feb-2026','YAAS292','Lakshaa Motiani',56000]]),'Reimbursements');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Date','Narration','Amount','Comments','Grouping','Particulars'],['01-Feb-2026','Opening Balance',34635242,'Opening','Opening Balance','Operational'],['05-Feb-2026','Zerodha Payment',5670499,'Invoice','Customer Receipts','Operational']]),'Cash Flow');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Client Name','IP Name','Amount'],['Zerodha Broking Limited','Markets by Zerodha',9980663]]),'Forecast');XLSX.writeFile(wb,'nocac_mis_template.xlsx')}
 
 // CLOUD SYNC — auto-push to cloud on every upload
+// Uses multiple free JSON storage services with fallback
 let CLOUD_BIN_ID = localStorage.getItem('nocac_bin_id') || '';
+let CLOUD_SERVICE = localStorage.getItem('nocac_cloud_svc') || '';
+
+const CLOUD_SERVICES = [
+  {
+    name: 'jsonblob',
+    create: async (data) => {
+      const r = await fetch('https://jsonblob.com/api/jsonBlob', {method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)});
+      if(!r.ok) throw new Error('Failed');
+      const loc = r.headers.get('Location') || r.headers.get('location');
+      const id = loc ? loc.split('/').pop() : (await r.json()).id;
+      return id;
+    },
+    update: async (id, data) => {
+      const r = await fetch('https://jsonblob.com/api/jsonBlob/'+id, {method:'PUT',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)});
+      if(!r.ok) throw new Error('Failed');
+    },
+    read: async (id) => {
+      const r = await fetch('https://jsonblob.com/api/jsonBlob/'+id);
+      if(!r.ok) throw new Error('Failed');
+      return await r.json();
+    }
+  },
+  {
+    name: 'npoint',
+    create: async (data) => {
+      const r = await fetch('https://api.npoint.io/', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:data})});
+      if(!r.ok) throw new Error('Failed');
+      const j = await r.json();
+      return j.id || j._id;
+    },
+    update: async (id, data) => {
+      const r = await fetch('https://api.npoint.io/'+id, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      if(!r.ok) throw new Error('Failed');
+    },
+    read: async (id) => {
+      const r = await fetch('https://api.npoint.io/'+id);
+      if(!r.ok) throw new Error('Failed');
+      return await r.json();
+    }
+  },
+  {
+    name: 'jsonbin-vercel',
+    create: async (data) => {
+      const r = await fetch('https://jsonbin-zeta.vercel.app/api/bins', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      if(!r.ok) throw new Error('Failed');
+      const j = await r.json();
+      return j.id;
+    },
+    update: async (id, data) => {
+      const r = await fetch('https://jsonbin-zeta.vercel.app/api/bins/'+id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      if(!r.ok) throw new Error('Failed');
+    },
+    read: async (id) => {
+      const r = await fetch('https://jsonbin-zeta.vercel.app/api/bins/'+id);
+      if(!r.ok) throw new Error('Failed');
+      const j = await r.json();
+      return j.data || j;
+    }
+  }
+];
+
+function getSvc(){return CLOUD_SERVICES.find(s=>s.name===CLOUD_SERVICE)||null}
 
 async function cloudSave(){
   const cleanFiles={};
@@ -345,34 +408,48 @@ async function cloudSave(){
   const activeKey=cleanFiles[ACT]?ACT:Object.keys(cleanFiles).sort().pop();
   const payload={files:cleanFiles,active:activeKey,updated:new Date().toISOString()};
 
-  try{
-    if(CLOUD_BIN_ID){
-      // Update existing bin
-      const resp=await fetch('https://jsonbin-zeta.vercel.app/api/bins/'+CLOUD_BIN_ID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      if(resp.ok){showStatus('✅ Published to cloud! Viewer will show data automatically.','var(--green)');return}
+  // Try update existing bin first
+  if(CLOUD_BIN_ID && CLOUD_SERVICE){
+    const svc=getSvc();
+    if(svc){
+      try{
+        await svc.update(CLOUD_BIN_ID, payload);
+        showStatus('✅ Data published! Users can see it now.','var(--green)');
+        updateViewerLink();
+        return;
+      }catch(e){console.warn('Update failed, will create new:',e)}
     }
-    // Create new bin
-    const resp=await fetch('https://jsonbin-zeta.vercel.app/api/bins',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    if(resp.ok){
-      const data=await resp.json();
-      CLOUD_BIN_ID=data.id;
-      localStorage.setItem('nocac_bin_id',CLOUD_BIN_ID);
-      updateViewerLink();
-      showStatus('✅ Published! Share the viewer link below.','var(--green)');
-    }else{showStatus('⚠️ Cloud save failed. Data saved locally only.','var(--orange)')}
-  }catch(e){console.error('Cloud save error:',e);showStatus('⚠️ Cloud save failed. Check internet connection.','var(--orange)')}
+  }
+
+  // Try each service to create new bin
+  for(const svc of CLOUD_SERVICES){
+    try{
+      showStatus('Publishing via '+svc.name+'...','var(--blue)');
+      const id = await svc.create(payload);
+      if(id){
+        CLOUD_BIN_ID=id;
+        CLOUD_SERVICE=svc.name;
+        localStorage.setItem('nocac_bin_id',id);
+        localStorage.setItem('nocac_cloud_svc',svc.name);
+        showStatus('✅ Published! Share the viewer link below.','var(--green)');
+        updateViewerLink();
+        return;
+      }
+    }catch(e){console.warn(svc.name+' failed:',e)}
+  }
+  showStatus('⚠️ Cloud publish failed. Try again in a moment.','var(--orange)');
 }
 
 function showStatus(msg,color){
   const el=document.getElementById('cloudStatus');
-  if(el){el.textContent=msg;el.style.color=color;setTimeout(()=>{el.textContent=''},5000)}
+  if(el){el.textContent=msg;el.style.color=color}
 }
 
 function updateViewerLink(){
   const el=document.getElementById('viewerLink');
   if(el&&CLOUD_BIN_ID){
-    const url='https://abhishekgandi-14.github.io/mis-admin/viewer.html?bin='+CLOUD_BIN_ID;
-    el.innerHTML=`<div style="margin-top:8px;padding:10px;background:rgba(45,212,168,.04);border:1px solid rgba(45,212,168,.15);border-radius:8px"><div style="font-size:8px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Share this link with users</div><a href="${url}" target="_blank" style="font-size:10px;color:var(--green);word-break:break-all;text-decoration:none">${url}</a><button onclick="navigator.clipboard.writeText('${url}');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)" style="margin-top:6px;padding:4px 12px;background:var(--card);border:1px solid var(--bd);border-radius:5px;color:var(--blue);font-size:9px;cursor:pointer;font-family:DM Sans;display:block">Copy</button></div>`;
+    const url='https://abhishekgandi-14.github.io/mis-admin/viewer.html?bin='+CLOUD_BIN_ID+'&svc='+CLOUD_SERVICE;
+    el.innerHTML=`<div style="margin-top:8px;padding:10px;background:rgba(45,212,168,.04);border:1px solid rgba(45,212,168,.15);border-radius:8px"><div style="font-size:8px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">📋 Share this link with users</div><a href="${url}" target="_blank" style="font-size:9px;color:var(--green);word-break:break-all;text-decoration:none">${url}</a><button onclick="navigator.clipboard.writeText('${url}');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Link',2000)" style="margin-top:6px;padding:4px 12px;background:var(--card);border:1px solid var(--bd);border-radius:5px;color:var(--blue);font-size:9px;cursor:pointer;font-family:DM Sans;display:block;width:100%">Copy Link</button></div>`;
   }
 }
 
@@ -381,7 +458,7 @@ function updatePubBtn(){document.getElementById('pubBtn').style.display=Object.k
 if(lF()){const k=Object.keys(FILES).sort();if(k.length){ACT=k[k.length-1];pF();const f=FILES[ACT];document.getElementById('fY').value=f.year;document.getElementById('fM').value=f.month;document.getElementById('welc').style.display='none';document.getElementById('uploadedInfo').style.display='block';document.getElementById('dC').style.display='block';document.getElementById('topSub').textContent='Nocac Ventures Pvt Ltd · '+f.month+' '+f.year;uFL();rAll();updatePubBtn();updateViewerLink()}}
 const mq=window.matchMedia('(max-width:800px)');function ck(){document.getElementById('mob').style.display=mq.matches?'grid':'none'}mq.addEventListener('change',ck);ck();
 
-// PUBLISH — now just triggers cloud save
+// PUBLISH button handler
 async function publishViewer(){
   if(!Object.keys(FILES).length){alert('No data to publish. Upload a file first.');return}
   showStatus('Publishing to cloud...','var(--blue)');
