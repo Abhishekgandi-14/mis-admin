@@ -310,8 +310,12 @@ function cTAT(D){const bc={};D.revenue.forEach(r=>{const c=gv(r,['Client Name','
 function cConc(D){const bc={};D.revenue.forEach(r=>{const c=gv(r,['Client Name','Client','Customer Name'])||'Unknown';bc[c]=(bc[c]||0)+tn(gv(r,['Taxable Value','Taxable_Value','Taxable Amount','Amount']))});const t=Object.values(bc).reduce((s,v)=>s+v,0);return Object.entries(bc).map(([n,r])=>({n,r,p:t?r/t:0})).sort((a,b)=>b.r-a.r)}
 function cConcIP(D){const bc={};D.revenue.forEach(r=>{const ip=gv(r,['IP Name','IP','Channel','IPName'])||'Unknown';bc[ip]=(bc[ip]||0)+tn(gv(r,['Taxable Value','Taxable_Value','Taxable Amount','Amount']))});const t=Object.values(bc).reduce((s,v)=>s+v,0);return Object.entries(bc).map(([n,r])=>({n,r,p:t?r/t:0})).sort((a,b)=>b.r-a.r)}
 
-// CLOUD CONFIG — This bin ID is shared between admin and viewer
-const CLOUD_BIN_ID = localStorage.getItem('nocac_bin_id') || '';
+// CLOUD CONFIG
+const CLOUD_READERS = {
+  jsonblob: async (id) => {const r=await fetch('https://jsonblob.com/api/jsonBlob/'+id);if(!r.ok)throw new Error();return await r.json()},
+  npoint: async (id) => {const r=await fetch('https://api.npoint.io/'+id);if(!r.ok)throw new Error();return await r.json()},
+  'jsonbin-vercel': async (id) => {const r=await fetch('https://jsonbin-zeta.vercel.app/api/bins/'+id);if(!r.ok)throw new Error();const j=await r.json();return j.data||j}
+};
 
 // LOAD DATA FROM CLOUD
 async function tryLoad(){
@@ -327,23 +331,26 @@ async function tryLoad(){
       }
     }catch(e){}
   }
-  // Try cloud
-  const binId = new URLSearchParams(window.location.search).get('bin') || CLOUD_BIN_ID;
-  if(!binId){document.getElementById('welc').style.display='';document.getElementById('dC').style.display='none';return}
-  try{
-    document.getElementById('welc').querySelector('h2').textContent='Loading Data...';
-    document.getElementById('welc').querySelector('p').textContent='Fetching dashboard data from cloud...';
-    const resp=await fetch('https://jsonbin-zeta.vercel.app/api/bins/'+binId);
-    if(!resp.ok)throw new Error('Fetch failed');
-    const json=await resp.json();
-    const data=json.data||json;
-    if(data.files){
-      FILES=data.files;
-      ACT=data.active||Object.keys(FILES).sort().pop();
-      Object.keys(FILES).forEach(k=>{const f=FILES[k];if(!f||!f.data||!f.data.revenue||!f.data.revenue.length)delete FILES[k]});
-      if(Object.keys(FILES).length>0){showData();return}
-    }
-  }catch(e){console.error('Cloud load error:',e)}
+
+  // Try cloud via URL params
+  const params = new URLSearchParams(window.location.search);
+  const binId = params.get('bin');
+  const svc = params.get('svc');
+
+  if(binId && svc && CLOUD_READERS[svc]){
+    try{
+      document.getElementById('welc').querySelector('h2').textContent='Loading Data...';
+      document.getElementById('welc').querySelector('p').textContent='Fetching dashboard data from cloud...';
+      const data = await CLOUD_READERS[svc](binId);
+      if(data && data.files){
+        FILES=data.files;
+        ACT=data.active||Object.keys(FILES).sort().pop();
+        Object.keys(FILES).forEach(k=>{const f=FILES[k];if(!f||!f.data||!f.data.revenue||!f.data.revenue.length)delete FILES[k]});
+        if(Object.keys(FILES).length>0){showData();return}
+      }
+    }catch(e){console.error('Cloud load error:',e)}
+  }
+
   // Fallback to localStorage
   try{
     const s=localStorage.getItem('nocac3');
@@ -356,6 +363,7 @@ async function tryLoad(){
       }
     }
   }catch(e){}
+
   document.getElementById('welc').querySelector('h2').textContent='Waiting for Data';
   document.getElementById('welc').querySelector('p').textContent='No MIS data has been published yet. The admin needs to upload MIS data first.';
   document.getElementById('welc').style.display='';
