@@ -155,7 +155,9 @@ td{padding:9px 12px;border-bottom:1px solid rgba(24,37,56,.5);color:var(--t2);wh
 <div class="up-a" onclick="document.getElementById('fi').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div class="ut">Upload MIS Excel</div><p>Monthly data file</p></div>
 <input type="file" id="fi" accept=".xlsx,.xls" style="display:none">
 <div class="fl" id="fList"></div>
-<div class="exp-a" onclick="publishViewer()" id="pubBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><div class="ut" style="color:var(--green)">Publish Viewer File</div><p>Download viewer.html to upload to GitHub</p></div>
+<div class="exp-a" onclick="publishViewer()" id="pubBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><div class="ut" style="color:var(--green)">Publish to Cloud</div><p>Make data visible to all users</p></div>
+<div id="cloudStatus" style="font-size:9px;font-weight:600;text-align:center;margin-top:6px;min-height:14px"></div>
+<div id="viewerLink"></div>
 </div>
 </aside>
 
@@ -269,7 +271,7 @@ function cConc(D){const bc={};D.revenue.forEach(r=>{const c=gv(r,['Client Name',
 function cConcIP(D){const bc={};D.revenue.forEach(r=>{const ip=gv(r,['IP Name','IP','Channel','IPName'])||'Unknown';bc[ip]=(bc[ip]||0)+tn(gv(r,['Taxable Value','Taxable_Value','Taxable Amount','Amount']))});const t=Object.values(bc).reduce((s,v)=>s+v,0);return Object.entries(bc).map(([n,r])=>({n,r,p:t?r/t:0})).sort((a,b)=>b.r-a.r)}
 
 // FILE MANAGEMENT
-document.getElementById('fi').addEventListener('change',function(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=function(ev){const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});const D=parseFile(wb);const id=D.year+'-'+D.month;FILES[id]={name:file.name,year:D.year,month:D.month,label:D.month+"'"+D.year.slice(-2),data:D};sF();pF();ACT=id;document.getElementById('fY').value=D.year;document.getElementById('fM').value=D.month;rAll();uFL();updatePubBtn();document.getElementById('welc').style.display='none';document.getElementById('uploadedInfo').style.display='block';document.getElementById('dC').style.display='block';document.getElementById('topSub').textContent='Nocac Ventures Pvt Ltd · '+D.month+' '+D.year};reader.readAsArrayBuffer(file);this.value=''});
+document.getElementById('fi').addEventListener('change',function(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=function(ev){const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});const D=parseFile(wb);const id=D.year+'-'+D.month;FILES[id]={name:file.name,year:D.year,month:D.month,label:D.month+"'"+D.year.slice(-2),data:D};sF();pF();ACT=id;document.getElementById('fY').value=D.year;document.getElementById('fM').value=D.month;rAll();uFL();updatePubBtn();document.getElementById('welc').style.display='none';document.getElementById('uploadedInfo').style.display='block';document.getElementById('dC').style.display='block';document.getElementById('topSub').textContent='Nocac Ventures Pvt Ltd · '+D.month+' '+D.year;cloudSave()};reader.readAsArrayBuffer(file);this.value=''});
 function sF(){try{localStorage.setItem('nocac3',JSON.stringify(FILES))}catch(e){}}
 function lF(){try{const s=localStorage.getItem('nocac3');if(s){FILES=JSON.parse(s);Object.keys(FILES).forEach(k=>{const f=FILES[k];if(!f||!f.data||!f.data.revenue||!f.data.revenue.length)delete FILES[k]});sF();return Object.keys(FILES).length>0}}catch(e){}return false}
 function uFL(){
@@ -333,44 +335,57 @@ function renderExpTab(D,tab){const cfg={salary:{t:'Salary',d:D.salary,ak:['Gross
 // TEMPLATE
 function downloadTemplate(){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Month','Client Name','Invoice Number','Taxable Value','GST','Invoice Value','Invoice Date','Payment Date'],["February'26",'Zerodha Broking Limited','NOCAC/25-26/001',3708887,667600,4376487,'04-Feb-2026','16-Feb-2026']]),'Revenue');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Employee ID','Name','Hire Date','Designation','Has Left The Organization','Working Days','Gross Salary'],['YAAS007','Nitesh Wankhede','15-Jan-2024','Channel Manager','No',28,101800]]),'Salary');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Freelancer ID','Name','Designation','Client Name','IP Name','Amount'],['FL001','Veehal Antony','Cinematographer','All Channels','All',222222]]),'Freelancers');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name of the Office','Amount'],['Hustle Space',348000]]),'Office Rent');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name of the Subscription','Amount'],['Google Workspace',283392]]),'Subscriptions');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Client Name','IP Name','Amount'],['John Doe','Vodafone','Brand IP',198200]]),'Influencer Marketing');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Shoot Description','Client Name','IP Name','Amount'],['Studio Shoot','Product Video','Meril','Main',187600]]),'Production Expenses');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Amount'],['Prudence Accounting',245000]]),'Professional Fee');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Amount'],['Telephone Expenses',3340]]),'Other Expenses');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Name','Description','Amount'],['Team Lunch','Monthly',15000]]),'Staff Welfare');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Date','YAAS ID','Name','Amount'],['24-Feb-2026','YAAS292','Lakshaa Motiani',56000]]),'Reimbursements');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Date','Narration','Amount','Comments','Grouping','Particulars'],['01-Feb-2026','Opening Balance',34635242,'Opening','Opening Balance','Operational'],['05-Feb-2026','Zerodha Payment',5670499,'Invoice','Customer Receipts','Operational']]),'Cash Flow');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Client Name','IP Name','Amount'],['Zerodha Broking Limited','Markets by Zerodha',9980663]]),'Forecast');XLSX.writeFile(wb,'nocac_mis_template.xlsx')}
 
-// INIT
-function updatePubBtn(){document.getElementById('pubBtn').style.display=Object.keys(FILES).length?'block':'none'}
-if(lF()){const k=Object.keys(FILES).sort();if(k.length){ACT=k[k.length-1];pF();const f=FILES[ACT];document.getElementById('fY').value=f.year;document.getElementById('fM').value=f.month;document.getElementById('welc').style.display='none';document.getElementById('uploadedInfo').style.display='block';document.getElementById('dC').style.display='block';document.getElementById('topSub').textContent='Nocac Ventures Pvt Ltd · '+f.month+' '+f.year;uFL();rAll();updatePubBtn()}}
-const mq=window.matchMedia('(max-width:800px)');function ck(){document.getElementById('mob').style.display=mq.matches?'grid':'none'}mq.addEventListener('change',ck);ck();
+// CLOUD SYNC — auto-push to cloud on every upload
+let CLOUD_BIN_ID = localStorage.getItem('nocac_bin_id') || '';
 
-// PUBLISH VIEWER — generates viewer.html with data baked in
-async function publishViewer(){
-  if(!Object.keys(FILES).length){alert('No data to publish. Upload a file first.');return}
+async function cloudSave(){
   const cleanFiles={};
   Object.keys(FILES).forEach(k=>{const f=FILES[k];if(f&&f.data&&f.data.revenue&&f.data.revenue.length>0)cleanFiles[k]=f});
-  if(!Object.keys(cleanFiles).length){alert('No valid data to publish.');return}
+  if(!Object.keys(cleanFiles).length)return;
   const activeKey=cleanFiles[ACT]?ACT:Object.keys(cleanFiles).sort().pop();
+  const payload={files:cleanFiles,active:activeKey,updated:new Date().toISOString()};
 
-  // Fetch the current viewer.html template from the same GitHub Pages site
-  let viewerTemplate='';
   try{
-    const resp=await fetch('viewer.html');
-    if(resp.ok){viewerTemplate=await resp.text()}
-    else{throw new Error('Could not fetch viewer.html')}
-  }catch(e){
-    alert('Error: viewer.html not found on the server. Make sure viewer.html is uploaded to your GitHub repo first as a template.');
-    return;
+    if(CLOUD_BIN_ID){
+      // Update existing bin
+      const resp=await fetch('https://jsonbin-zeta.vercel.app/api/bins/'+CLOUD_BIN_ID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(resp.ok){showStatus('✅ Published to cloud! Viewer will show data automatically.','var(--green)');return}
+    }
+    // Create new bin
+    const resp=await fetch('https://jsonbin-zeta.vercel.app/api/bins',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(resp.ok){
+      const data=await resp.json();
+      CLOUD_BIN_ID=data.id;
+      localStorage.setItem('nocac_bin_id',CLOUD_BIN_ID);
+      updateViewerLink();
+      showStatus('✅ Published! Share the viewer link below.','var(--green)');
+    }else{showStatus('⚠️ Cloud save failed. Data saved locally only.','var(--orange)')}
+  }catch(e){console.error('Cloud save error:',e);showStatus('⚠️ Cloud save failed. Check internet connection.','var(--orange)')}
+}
+
+function showStatus(msg,color){
+  const el=document.getElementById('cloudStatus');
+  if(el){el.textContent=msg;el.style.color=color;setTimeout(()=>{el.textContent=''},5000)}
+}
+
+function updateViewerLink(){
+  const el=document.getElementById('viewerLink');
+  if(el&&CLOUD_BIN_ID){
+    const url='https://abhishekgandi-14.github.io/mis-admin/viewer.html?bin='+CLOUD_BIN_ID;
+    el.innerHTML=`<div style="margin-top:8px;padding:10px;background:rgba(45,212,168,.04);border:1px solid rgba(45,212,168,.15);border-radius:8px"><div style="font-size:8px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Share this link with users</div><a href="${url}" target="_blank" style="font-size:10px;color:var(--green);word-break:break-all;text-decoration:none">${url}</a><button onclick="navigator.clipboard.writeText('${url}');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)" style="margin-top:6px;padding:4px 12px;background:var(--card);border:1px solid var(--bd);border-radius:5px;color:var(--blue);font-size:9px;cursor:pointer;font-family:DM Sans;display:block">Copy</button></div>`;
   }
+}
 
-  // Inject the data as an embedded script right before </head>
-  const dataScript=`<script>window.NOCAC_EMBEDDED_DATA=${JSON.stringify({files:cleanFiles,active:activeKey})};<\/script>`;
-  const publishedHTML=viewerTemplate.replace('</head>',dataScript+'\n</head>');
+// INIT
+function updatePubBtn(){document.getElementById('pubBtn').style.display=Object.keys(FILES).length?'block':'none'}
+if(lF()){const k=Object.keys(FILES).sort();if(k.length){ACT=k[k.length-1];pF();const f=FILES[ACT];document.getElementById('fY').value=f.year;document.getElementById('fM').value=f.month;document.getElementById('welc').style.display='none';document.getElementById('uploadedInfo').style.display='block';document.getElementById('dC').style.display='block';document.getElementById('topSub').textContent='Nocac Ventures Pvt Ltd · '+f.month+' '+f.year;uFL();rAll();updatePubBtn();updateViewerLink()}}
+const mq=window.matchMedia('(max-width:800px)');function ck(){document.getElementById('mob').style.display=mq.matches?'grid':'none'}mq.addEventListener('change',ck);ck();
 
-  // Download as viewer.html
-  const blob=new Blob([publishedHTML],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='viewer.html';
-  a.click();
-  URL.revokeObjectURL(url);
-
-  alert('✅ viewer.html downloaded!\\n\\nNow upload this file to your GitHub repo:\\n1. Go to github.com/Abhishekgandi-14/mis-admin\\n2. Click the existing viewer.html file\\n3. Click the pencil icon (edit) or delete & re-upload\\n4. Upload the new viewer.html\\n5. Commit changes\\n\\nYour public dashboard will update in 2-3 minutes!');
+// PUBLISH — now just triggers cloud save
+async function publishViewer(){
+  if(!Object.keys(FILES).length){alert('No data to publish. Upload a file first.');return}
+  showStatus('Publishing to cloud...','var(--blue)');
+  await cloudSave();
 }
 </script>
 </body>
