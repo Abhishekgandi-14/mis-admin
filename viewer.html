@@ -598,8 +598,32 @@ function rConc(D){const cc=cConc(D);if(!cc.length)return;
   let cum=0;document.querySelector('#tCC tbody').innerHTML=cc.map((c,i)=>{cum+=c.p;return`<tr><td style="font-weight:600">${i+1}</td><td style="color:${CL[i%CL.length]};font-weight:600">${TC(c.n)}</td><td class="pos">${INR(c.r)}</td><td>${PCT(c.p)}</td><td class="blu">${PCT(cum)}</td></tr>`}).join('');
 }
 
-// INIT — Load data and render
-tryLoad();
+// INIT — Load data from embedded data (for published version) or localStorage (for same-domain)
+function initApp(){
+  // Check for embedded data first (published version - works on any device)
+  if(window.NOCAC_EMBEDDED_DATA){
+    try{
+      FILES=JSON.parse(JSON.stringify(window.NOCAC_EMBEDDED_DATA.files));
+      ACT=window.NOCAC_EMBEDDED_DATA.active;
+      Object.keys(FILES).forEach(k=>{const f=FILES[k];if(!f||!f.data||!f.data.revenue||!f.data.revenue.length)delete FILES[k]});
+      if(Object.keys(FILES).length>0){
+        if(!FILES[ACT])ACT=Object.keys(FILES).sort().pop();
+        pF();
+        const f=FILES[ACT];
+        document.getElementById('fY').value=f.year;
+        document.getElementById('fM').value=f.month;
+        document.getElementById('welc').style.display='none';
+        document.getElementById('dC').style.display='block';
+        document.getElementById('topSub').textContent='Nocac Ventures Pvt Ltd · '+f.month+' '+f.year;
+        rAll();
+        return;
+      }
+    }catch(e){console.error('Embedded data error:',e)}
+  }
+  // Fallback to localStorage (same-domain admin/viewer setup)
+  tryLoad();
+}
+initApp();
 
 // Auto-refresh: listen for storage changes from admin (works across tabs on same domain)
 window.addEventListener('storage',function(e){if(e.key==='nocac3')tryLoad()});
