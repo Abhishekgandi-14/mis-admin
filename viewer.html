@@ -310,14 +310,7 @@ function cTAT(D){const bc={};D.revenue.forEach(r=>{const c=gv(r,['Client Name','
 function cConc(D){const bc={};D.revenue.forEach(r=>{const c=gv(r,['Client Name','Client','Customer Name'])||'Unknown';bc[c]=(bc[c]||0)+tn(gv(r,['Taxable Value','Taxable_Value','Taxable Amount','Amount']))});const t=Object.values(bc).reduce((s,v)=>s+v,0);return Object.entries(bc).map(([n,r])=>({n,r,p:t?r/t:0})).sort((a,b)=>b.r-a.r)}
 function cConcIP(D){const bc={};D.revenue.forEach(r=>{const ip=gv(r,['IP Name','IP','Channel','IPName'])||'Unknown';bc[ip]=(bc[ip]||0)+tn(gv(r,['Taxable Value','Taxable_Value','Taxable Amount','Amount']))});const t=Object.values(bc).reduce((s,v)=>s+v,0);return Object.entries(bc).map(([n,r])=>({n,r,p:t?r/t:0})).sort((a,b)=>b.r-a.r)}
 
-// CLOUD CONFIG
-const CLOUD_READERS = {
-  jsonblob: async (id) => {const r=await fetch('https://jsonblob.com/api/jsonBlob/'+id);if(!r.ok)throw new Error();return await r.json()},
-  npoint: async (id) => {const r=await fetch('https://api.npoint.io/'+id);if(!r.ok)throw new Error();return await r.json()},
-  'jsonbin-vercel': async (id) => {const r=await fetch('https://jsonbin-zeta.vercel.app/api/bins/'+id);if(!r.ok)throw new Error();const j=await r.json();return j.data||j}
-};
-
-// LOAD DATA FROM CLOUD
+// LOAD DATA — reads data.json from the same GitHub Pages site
 async function tryLoad(){
   // First check for embedded data
   if(window.NOCAC_EMBEDDED_DATA){
@@ -325,31 +318,25 @@ async function tryLoad(){
       FILES=JSON.parse(JSON.stringify(window.NOCAC_EMBEDDED_DATA.files));
       ACT=window.NOCAC_EMBEDDED_DATA.active;
       Object.keys(FILES).forEach(k=>{const f=FILES[k];if(!f||!f.data||!f.data.revenue||!f.data.revenue.length)delete FILES[k]});
-      if(Object.keys(FILES).length>0){
-        if(!FILES[ACT])ACT=Object.keys(FILES).sort().pop();
-        showData();return;
-      }
+      if(Object.keys(FILES).length>0){if(!FILES[ACT])ACT=Object.keys(FILES).sort().pop();showData();return}
     }catch(e){}
   }
 
-  // Try cloud via URL params
-  const params = new URLSearchParams(window.location.search);
-  const binId = params.get('bin');
-  const svc = params.get('svc');
-
-  if(binId && svc && CLOUD_READERS[svc]){
-    try{
-      document.getElementById('welc').querySelector('h2').textContent='Loading Data...';
-      document.getElementById('welc').querySelector('p').textContent='Fetching dashboard data from cloud...';
-      const data = await CLOUD_READERS[svc](binId);
-      if(data && data.files){
+  // Fetch data.json from same site (GitHub Pages serves it as static file)
+  try{
+    document.getElementById('welc').querySelector('h2').textContent='Loading Data...';
+    document.getElementById('welc').querySelector('p').textContent='Fetching dashboard data...';
+    const resp=await fetch('data.json?t='+Date.now());
+    if(resp.ok){
+      const data=await resp.json();
+      if(data&&data.files){
         FILES=data.files;
         ACT=data.active||Object.keys(FILES).sort().pop();
         Object.keys(FILES).forEach(k=>{const f=FILES[k];if(!f||!f.data||!f.data.revenue||!f.data.revenue.length)delete FILES[k]});
         if(Object.keys(FILES).length>0){showData();return}
       }
-    }catch(e){console.error('Cloud load error:',e)}
-  }
+    }
+  }catch(e){console.error('Load error:',e)}
 
   // Fallback to localStorage
   try{
@@ -357,10 +344,7 @@ async function tryLoad(){
     if(s){
       FILES=JSON.parse(s);
       Object.keys(FILES).forEach(k=>{const f=FILES[k];if(!f||!f.data||!f.data.revenue||!f.data.revenue.length)delete FILES[k]});
-      if(Object.keys(FILES).length>0){
-        ACT=Object.keys(FILES).sort().pop();
-        showData();return;
-      }
+      if(Object.keys(FILES).length>0){ACT=Object.keys(FILES).sort().pop();showData();return}
     }
   }catch(e){}
 
